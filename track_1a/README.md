@@ -53,7 +53,7 @@ Your findings files must be shared under a CDLA-Permissive-2.0 license. However,
 ### Technical Report (pdf)
 - Update [technical_report.md](technical_report.md) in this repository with all the details for your submission.
 - Upload a pdf of your technical report to this directory, named as `TeamName_Report.pdf`.
-- Format: pdf, max. 6 pages
+- Format: pdf, max. 6 pages w/o references
 - Submit the pdf of the technical report.
 
 ### Findings Dataset
