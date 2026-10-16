@@ -34,6 +34,11 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
 - **Key handling:** the API key lives in `browser.storage.local` and is only read by the background script. Page scripts never receive it.
 - **Benchmark pipeline** (`src/roestibridge`): a stdlib-only Python client (`llm.py`), span → token projection (`rsd.py`), the metric (`metrics.py`, a faithful re-implementation of the official `evaluate_predictions_admin.py` pooling) and a CLI. It reads the **same `prompt.json`** as the extension, and a unit test enforces this.
 
+| Federal page: hover card | Parliamentary PDF: hover card |
+|---|---|
+| ![bag.admin.ch FR vs DE](docs/screenshot_gov_tooltip.jpg){width=48%} | ![Fedlex PDF DE vs FR](docs/screenshot_pdf_tooltip.jpg){width=48%} |
+
+
 ## 3. Use of Apertus
 
 - **Model:** `swiss-ai/Apertus-v1.5-70B` (CSCS-hosted, OpenAI-compatible endpoint). `Apertus-v1.5-8B` can be selected in the options for on-prem use.
