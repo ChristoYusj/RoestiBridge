@@ -44,7 +44,8 @@
     const diffs = res.differences.map((d) => Object.assign({}, d, { lang: t, source: page.url }));
     const n = RBHighlight.apply(root, diffs);
     const onlyThere = diffs.filter((d) => !d.a).length;
-    const extra = [onlyThere ? `${onlyThere} only in ${t.toUpperCase()}` : "", diffs.length - onlyThere - n > 0 ? `${diffs.length - onlyThere - n} not locatable` : ""].filter(Boolean).join(", ");
+    const extra = [onlyThere ? `${onlyThere} only in ${t.toUpperCase()}` : "", diffs.length - onlyThere - n > 0 ? `${diffs.length - onlyThere - n} not locatable` : "",
+      res.failedChunks ? `${res.failedChunks} part(s) not checked` : ""].filter(Boolean).join(", ");
     summary.push(`<a href="${RBHighlight.esc(page.url)}">${t.toUpperCase()}</a>: ${n} flagged${extra ? " (" + extra + ")" : ""}`);
   }
   RBHighlight.status(summary.join(" · "), "done");

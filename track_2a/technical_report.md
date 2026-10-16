@@ -31,6 +31,7 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
   - Federal domains are compared with FR and DE (whichever the page is not in).
   - Bilingual cantons (BE/FR/VS/GR) are compared with the other official language.
   - Monolingual cantons are compared with their official language.
+- **Robustness:** every Apertus request has a 120 s timeout and 3 retries. A failing chunk does not discard the others; the pill says "n part(s) not checked". Only complete results are cached, and errors show their reason (e.g. `invalid API key`). The options page tests the key when you save it.
 - **Key handling:** the API key lives in `browser.storage.local` and is only read by the background script. Page scripts never receive it.
 - **Benchmark pipeline** (`src/roestibridge`): a stdlib-only Python client (`llm.py`), span → token projection (`rsd.py`), the metric (`metrics.py`, a faithful re-implementation of the official `evaluate_predictions_admin.py` pooling) and a CLI. It reads the **same `prompt.json`** as the extension, and a unit test enforces this.
 
@@ -89,18 +90,18 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
 
 | Case | Result |
 |---|---|
-| bfe.admin.ch/fr → DE | 3 highlighted, e.g. a paragraph on the IAEA General Conference that is missing in the German version |
+| bfe.admin.ch/fr → DE | 3–4 highlighted, e.g. a paragraph on the IAEA General Conference that is missing in the German version |
 | be.ch/fr → DE (bilingual canton) | 1 highlighted, a tone shift ("beau palmarès" vs "brillieren") |
 | bag.admin.ch FR → DE | Counterpart found via Apertus slug matching (`agenda-soins-de-base` → `agenda-grundversorgung`); 0–9 differences depending on the run, mostly list items |
 | ch.ch/it → DE and FR (federal: both) | 0 differences on the homepage |
-| RTS Amaudruz article → SRF | SRF story found and linked ("SVP-Nationalrätin Céline Amaudruz will Bundesrätin werden"); 8 differences highlighted |
+| RTS Amaudruz article → SRF | SRF story found and linked ("SVP-Nationalrätin Céline Amaudruz will Bundesrätin werden"); 8–9 differences highlighted |
 | parlament.ch PDF link (DE) | Redirected into the RöstiBridge viewer; FR counterpart found via OpenParlData affair 234959 (`Kinderabzug = 12'000 Franken` → `déduction pour enfants = 12 000 francs`); the tables agree (0 differences) |
-| Fedlex consultation PDF (DE↔FR) | 16 differences, including articles where the French reads "Ne concerne que le texte allemand" while the German changes the provision; 5 located on the text layer |
+| Fedlex consultation PDF (DE↔FR) | 16 differences, including articles where the French reads "Ne concerne que le texte allemand" while the German changes the provision; 10 of 16 located on the text layer (5 before the locator fallbacks) |
 
 ## 6. Limitations
 
 - **Absolute scores are low.** This is consistent with [1], where prompted LLMs struggle on document-level cross-lingual RSD. The dev subset is small (120 pairs), so the post-processing choices may be slightly overfit.
-- **Extension chunk alignment is proportional (± 4 blocks).** When a page has very different structures across languages, content outside the window can be reported as "missing". Apertus sometimes quotes the wrong side; such spans are simply not highlighted (10 of 15 in the PDF case).
+- **Extension chunk alignment is proportional (± 4 blocks).** When a page has very different structures across languages, content outside the window can be reported as "missing". Apertus sometimes quotes the wrong side or paraphrases. The locator then tries the other excerpt and the first or last six words of the quote, which raised the Fedlex PDF from 5 to 10 of 16 located; the rest are counted as "not locatable" in the status pill.
 - **Counterpart discovery depends on site conventions.**
   - The admin.ch slug matcher needs both homepages to list the page.
   - RTS→SRF depends on a third-party news search (Bing News RSS, DuckDuckGo fallback), and SRF is independent journalism, not a translation. Differences there mean coverage differences, not translation errors.

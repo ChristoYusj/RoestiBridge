@@ -32,13 +32,18 @@ async function compareBlocks(msg) {
   if (hit[key]) return { differences: hit[key], cached: true };
   const chunks = chunkPairs(msg.blocksA, msg.blocksB);
   const out = [];
-  // small concurrency to be gentle with the shared endpoint
+  let failed = 0, lastError = "";
+  // small concurrency to be gentle with the shared endpoint; one failing chunk must not lose the others
   for (let k = 0; k < chunks.length; k += 3) {
-    const part = await Promise.all(chunks.slice(k, k + 3).map((c) => RBEngine.compare(c.a, c.b, msg.langA, msg.langB)));
-    part.forEach((d) => out.push(...d));
+    const part = await Promise.allSettled(chunks.slice(k, k + 3).map((c) => RBEngine.compare(c.a, c.b, msg.langA, msg.langB)));
+    for (const p of part) {
+      if (p.status === "fulfilled") out.push(...p.value);
+      else { failed++; lastError = String((p.reason && p.reason.message) || p.reason); }
+    }
   }
-  await browser.storage.local.set({ [key]: out });
-  return { differences: out, cached: false, chunks: chunks.length };
+  if (failed === chunks.length && chunks.length) return { error: lastError };   // nothing worked: surface why
+  if (!failed) await browser.storage.local.set({ [key]: out });                // only cache complete results
+  return { differences: out, cached: false, chunks: chunks.length, failedChunks: failed };
 }
 
 async function fetchText(url) {

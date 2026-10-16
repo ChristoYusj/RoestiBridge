@@ -106,12 +106,26 @@
   function apply(root, diffs) {
     let shown = 0;
     diffs.forEach((d, i) => {
-      if (!d.a || typeof d.a !== "string") return;
       const id = "d" + Object.keys(registry).length + "_" + i;
-      registry[id] = [d];
-      if (highlight(root, d.a, { id, severity: d.severity })) shown++;
+      const a = typeof d.a === "string" ? d.a : "", b = typeof d.b === "string" ? d.b : "";
+      const mark = (text, entry) => { registry[id] = [entry]; return highlight(root, text, { id, severity: d.severity }) > 0; };
+      // 1) the excerpt as quoted
+      if (a && mark(a, d)) { shown++; return; }
+      // 2) the model quoted the two sides the wrong way round: the "other" excerpt is on this page
+      if (b && mark(b, Object.assign({}, d, { a: b, b: a }))) { shown++; return; }
+      // 3) long excerpts that were paraphrased slightly: anchor on their first / last words
+      for (const part of anchors(a)) if (mark(part, d)) { shown++; return; }
+      delete registry[id];
     });
     return shown;
+  }
+
+  /* First and last 6-word windows of a long excerpt (each at least 20 characters), so a slightly
+     paraphrased quote still lands on the right passage instead of being dropped. */
+  function anchors(text) {
+    const w = text.split(/\s+/).filter(Boolean);
+    if (w.length < 8) return [];
+    return [w.slice(0, 6).join(" "), w.slice(-6).join(" ")].filter((s) => s.length >= 20);
   }
 
   let pill = null;

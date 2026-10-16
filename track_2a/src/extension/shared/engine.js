@@ -47,12 +47,25 @@
 
   async function chat(messages, cfg) {
     const body = { model: cfg.model, messages, temperature: 0, max_tokens: cfg.maxTokens || 2000, response_format: { type: "json_object" } };
+    let lastError = "Apertus endpoint unavailable";
     for (let attempt = 0; attempt < 3; attempt++) {
-      const r = await fetch(cfg.baseUrl.replace(/\/$/, "") + "/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.apiKey },
-        body: JSON.stringify(body)
-      });
+      let r;
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 120000);   // a hung request must not freeze the page check
+      try {
+        r = await fetch(cfg.baseUrl.replace(/\/$/, "") + "/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + cfg.apiKey },
+          body: JSON.stringify(body),
+          signal: ctl.signal
+        });
+      } catch (e) {
+        lastError = e.name === "AbortError" ? "Apertus request timed out" : "network error: " + e.message;
+        await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+        continue;
+      } finally {
+        clearTimeout(timer);
+      }
       if (r.ok) {
         const j = await r.json();
         return j.choices[0].message.content || "";
@@ -62,9 +75,10 @@
         const detail = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
         throw new Error("API key rejected (" + r.status + ")" + (detail ? ": " + detail : ""));
       }
+      lastError = "Apertus endpoint returned HTTP " + r.status;
       await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
     }
-    throw new Error("Apertus endpoint unavailable");
+    throw new Error(lastError);
   }
 
   /* Compare two texts; returns differences with numeric severity. */
