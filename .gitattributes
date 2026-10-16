@@ -3,3 +3,5 @@ Makefile text eol=lf
 Dockerfile text eol=lf
 *.xpi binary
 *.jpg binary
+*.jsonl text eol=lf
+*.json text eol=lf

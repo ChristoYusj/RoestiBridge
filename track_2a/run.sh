@@ -19,8 +19,15 @@ echo "== 3. Rebuild the submitted test predictions from the shipped raw Apertus 
 python -m roestibridge relabel --pred out/test_70b_n3
 python -m roestibridge export --dev out/dev_70b_n3_full --test out/test_70b_n3 --out out/submission
 echo "   -> out/submission/RoestiBridge_Apertus-70B_admin_{de,fr,it}.jsonl.jsonl (224 docs each, full-set order)"
-cmp -s out/submission/RoestiBridge_Apertus-70B_admin_de.jsonl.jsonl predictions_shipped/submission/RoestiBridge_Apertus-70B_admin_de.jsonl.jsonl \
-  && echo "   rebuilt submission == shipped submission (de)" || { echo "   MISMATCH vs shipped submission"; exit 1; }
+python - <<'PY'
+import json, sys
+for lang in ("de", "fr", "it"):
+    name = f"RoestiBridge_Apertus-70B_admin_{lang}.jsonl.jsonl"
+    rows = lambda p: [json.loads(x) for x in open(p, encoding="utf-8").read().splitlines() if x.strip()]
+    if rows(f"out/submission/{name}") != rows(f"predictions_shipped/submission/{name}"):
+        sys.exit(f"   MISMATCH vs shipped submission ({lang})")
+print("   rebuilt submission == shipped submission (de, fr, it; 224 docs each)")
+PY
 if [ -n "$LLM_API_KEY" ]; then
   echo "== 4. Live run: ${LLM_NAME} on ${LIVE_LIMIT:-5} dev documents per language =="
   python -m roestibridge predict --split dev --limit "${LIVE_LIMIT:-5}" --workers 4 --out out/live_dev
