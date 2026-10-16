@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RöstiBridge PDF</title>
+  <link rel="stylesheet" href="../content/style.css">
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+  <header class="bar">
+    <span class="rb-logo">RöstiBridge</span>
+    <span id="name" class="name"></span>
+    <label>Compare with
+      <input id="other" type="url" placeholder="URL of the other-language PDF" size="60">
+    </label>
+    <button id="go">Compare</button>
+    <a id="orig" target="_blank" rel="noopener">open original</a>
+    <span id="state" class="state"></span>
+  </header>
+  <main id="pages"></main>
+  <script src="../shared/sites.js"></script>
+  <script src="../content/highlight.js"></script>
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>

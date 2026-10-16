@@ -1,0 +1,9 @@
+{
+  "model": "swiss-ai/Apertus-v1.5-70B",
+  "base_url": "https://api.inference.cscs.ch/v1",
+  "prompt_version": "rb-prompt-v1",
+  "split": "dev",
+  "limit": 40,
+  "samples": 3,
+  "started": "2026-10-16T09:43:50"
+}

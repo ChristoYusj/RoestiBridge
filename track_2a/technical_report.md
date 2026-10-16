@@ -1,63 +1,128 @@
-# Technical report — `project name`
+# Technical report: RöstiBridge
 
-A deeper write-up than the README: what you built, how it works, and what the
-numbers say. Also check the specific submission requirements for your Academia
-challenge and add required information here.
-
-- **Track:** `Track 2A — challenge name`
+- **Track:** Track 2A, UZH: Detecting Cross-Lingual Semantic Differences in Swiss Government Websites
 - **Event:** Online
-- **Team:** `team name` — `member`, `member`, `member`
-- **Demo:** `link to video, deployment, or notebook`
+- **Team:** ⟨team name⟩: ⟨members⟩
+- **Demo:** Firefox extension in `src/extension` (`dist/roestibridge-0.1.0.xpi`); screenshots in `docs/`
 
 ## 1. Summary
 
-The problem, your approach, and the headline result in one paragraph.
+Swiss authorities publish the same page in up to four languages, and the versions do not always say the same thing: sentences are dropped, numbers or deadlines change, or "must" becomes "may". RöstiBridge brings token-level recognition of semantic differences (RSD) to the reader. It is a Firefox extension that highlights passages of an official page (federal, cantonal, RTS news, or a parliamentary PDF) whose meaning may differ from the reference language version. Hovering a highlight shows the other version's excerpt as a citation and an Apertus explanation.
+
+The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-70B reports difference spans, which are projected onto tokens; 3-sample self-consistency averages them. On a 120-document dev subset this gives a macro token-level Spearman of **0.131**, against 0.083 for a model-free number-mismatch baseline and 0.096 for the raw single-sample spans. Test-split predictions (168 documents) are in `predictions/test_70b_n3/`.
 
 ## 2. Architecture
 
-Components, data flow, and where each one runs. Put diagrams in `docs/` and
-reference them here.
+```
+ page / PDF in language X ──► extract blocks ──► find counterpart in language Y
+   (content script / pdf.js)                      hreflang · switcher · /de/↔/fr/ URL
+                                                  · Apertus path matching (admin.ch CMS)
+                                                  · OpenParlData affair siblings (parlament.ch PDFs)
+                                                  · Bing-News RSS + Apertus story matching (RTS→SRF)
+             │                                              │
+             └──────► background.js: chunk aligned blocks (≈3.5k chars, proportional
+                      window ±4 blocks) ──► Apertus (shared/prompt.json) ──► JSON
+                      {a, b, type, severity, explanation} ──► cache (storage.local)
+             ◄────── highlight `a` excerpts (whitespace-agnostic matching across nodes /
+                      text-layer spans) + hover card (citation `b` + explanation)
+```
+
+- **Federal vs. cantonal logic** (`shared/sites.js`):
+  - Federal domains are compared with FR and DE (whichever the page is not in).
+  - Bilingual cantons (BE/FR/VS/GR) are compared with the other official language.
+  - Monolingual cantons are compared with their official language.
+- **Key handling:** the API key lives in `browser.storage.local` and is only read by the background script. Page scripts never receive it.
+- **Benchmark pipeline** (`src/roestibridge`): a stdlib-only Python client (`llm.py`), span → token projection (`rsd.py`), the metric (`metrics.py`, a faithful re-implementation of the official `evaluate_predictions_admin.py` pooling) and a CLI. It reads the **same `prompt.json`** as the extension, and a unit test enforces this.
 
 ## 3. Use of Apertus
 
-- **Model:** `e.g. swiss-ai/Apertus-v1.5-8B`
-- **How it is used:** inference | fine-tuning | evaluation | red-teaming | agents / tool use
-- **Where it runs:** `local weights, hosted endpoint, ...`
-
-Prompts, adapters, quantisation, serving stack — whatever a reader needs to
-rebuild your setup.
+- **Model:** `swiss-ai/Apertus-v1.5-70B` (CSCS-hosted, OpenAI-compatible endpoint). `Apertus-v1.5-8B` can be selected in the options for on-prem use.
+- **How it is used:** prompting-only inference with JSON output (`response_format: json_object`, with a fallback when the endpoint does not support it). Apertus is used for:
+  1. difference detection with severity and explanation (core RSD);
+  2. matching translated URL slugs on the new admin.ch CMS;
+  3. turning an RTS headline into German search queries and deciding whether an SRF article is the same story;
+  4. picking the translated sibling of a parliamentary document.
+- **Prompt:** `src/extension/shared/prompt.json` (`rb-prompt-v1`). The system prompt defines what counts as a difference (omission/addition, numbers/dates, obligation/scope, legal terms, actionable nuance) and what does not (grammar, word order, free translation). It asks for exact, short excerpts.
+- **Benchmark settings:** temperature 0 for the first sample and 0.7 for samples 2–3, `max_tokens` 2000, one call per document pair. Token usage (from the API) is about 0.82M prompt and 0.25M completion tokens for the 3-sample test run (`raw_*.jsonl` → `usage`).
+- **No other model is used** anywhere in the pipeline or for evaluation.
 
 ## 4. Data
 
-What you used, where it came from, and its licence. Flag anything personal or
-non-redistributable, and keep it out of the repository (see `.gitignore`).
-If data comes from human subjects or contains personal information, describe
-how consent was obtained.
+- **SwissGov-RSD** [1] (`ZurichNLP/SwissGov-RSD` on Hugging Face) is downloaded at run time into `data/swissgov-rsd/` and is not committed.
+- Development used a deterministic, evenly spaced **40-document subset of the dev split per language** (`--limit 40`, 120 pairs) to stay within the API budget.
+- **The test split was never evaluated or inspected:** `evaluate --split test` exits with an error.
+- Test predictions were produced once with the prompt and post-processing frozen on dev.
+- The extension processes public government pages on the fly and stores nothing beyond a local cache of model answers.
+- Note: the dataset's DE/FR/IT texts contain U+FFFD replacement characters in place of accented letters (e.g. `L�approvisionnement`). The prompt tells the model to copy excerpts verbatim "even if characters look garbled", and the projection treats `�` as a word character.
 
 ## 5. Evaluation
 
-How you measured success: task, metric, baseline.
+**Metric:** the official one. For each language pair, all tokens of side A and side B with gold ≠ −1 are pooled (predictions are padded or truncated to the gold length), global Spearman is computed, and the macro average is taken over EN–DE/FR/IT. Our implementation matches `scipy.stats.spearmanr` on the pooled vectors (checked in development).
 
-| Setup    | Metric | Result |
-|----------|--------|--------|
-| Baseline |        |        |
-| Ours     |        |        |
+| Setup (dev subset, 40 docs/pair) | DE | FR | IT | **macro** |
+|---|---|---|---|---|
+| Number-mismatch baseline (no LLM) | 0.102 | 0.068 | 0.080 | 0.083 |
+| Apertus-70B, 1 sample, all spans at severity/5 | 0.136 | 0.056 | 0.096 | 0.096 |
+| + drop severity 1, omission/addition = 1.0 | 0.157 | 0.069 | 0.100 | 0.109 |
+| + number-mismatch prior (max) | 0.159 | 0.074 | 0.104 | 0.112 |
+| **+ 3 samples, averaged (submitted)** | **0.191** | **0.077** | **0.125** | **0.131** |
+
+**Ablations** (no extra API calls; `python -m roestibridge.ablate`):
+
+| Variant | Macro | Result |
+|---|---|---|
+| Binary span scores instead of severity | 0.095 | Worse |
+| Damping long spans by length | ±0.001 | No gain |
+| Paragraph-context smoothing | 0.099 | No gain |
+
+**Error analysis (FR, 1 sample):**
+- **Low precision.** Of the tokens we mark, 226 are true positives and 1,752 are false positives. Apertus over-reports "different wording, same meaning" spans at low severity, which motivated the severity ≥ 2 cut. Recall is limited too (1,119 gold-positive tokens missed): many gold differences are small structural omissions such as link labels and list items.
+- **Span projection is reliable:** 376 of 382 returned excerpts were located in the token sequence.
+- **FR is the weakest pair.** The FR documents are longer (461 vs 363 tokens on average for DE) and the FR texts carry the most `�` corruption.
+
+**Extension checks** (live sites, 16 Oct 2026):
+
+| Case | Result |
+|---|---|
+| bag.admin.ch FR → DE | Counterpart found via Apertus slug matching (`agenda-soins-de-base` → `agenda-grundversorgung`, `soins-palliatifs` → `palliative-care`); 5–9 differences, mostly list items present in only one version |
+| Fedlex consultation PDF (DE↔FR) | 15 differences, including articles where the French reads "Ne concerne que le texte allemand" while the German changes the provision; 5 located on the text layer |
+| parlament.ch DE PDF → FR | Found via OpenParlData affair 234959 (`Kinderabzug = 12'000 Franken` → `déduction pour enfants = 12 000 francs`); the two tables agree (0 differences) |
+| RTS → SRF | Amaudruz stories linked to SRF's candidacy article; stories SRF did not cover fall back to search links |
 
 ## 6. Limitations
 
-Where it breaks, what you did not test, and known failure modes.
+- **Absolute scores are low.** This is consistent with [1], where prompted LLMs struggle on document-level cross-lingual RSD. The dev subset is small (120 pairs), so the post-processing choices may be slightly overfit.
+- **Extension chunk alignment is proportional (± 4 blocks).** When a page has very different structures across languages, content outside the window can be reported as "missing". Apertus sometimes quotes the wrong side; such spans are simply not highlighted (10 of 15 in the PDF case).
+- **Counterpart discovery depends on site conventions.**
+  - The admin.ch slug matcher needs both homepages to list the page.
+  - RTS→SRF depends on a third-party news search (Bing News RSS, DuckDuckGo fallback), and SRF is independent journalism, not a translation. Differences there mean coverage differences, not translation errors.
+- **Language metadata:** OpenParlData labels some French parlament.ch documents as `it`. We therefore ask Apertus to pick by title rather than trusting the language field.
+- **Packaging:** the extension is unsigned (temporary add-on) and uses Manifest V2 for blocking `webRequest` (PDF interception).
+- **No human evaluation of the extension's highlights** was done in the time available.
 
 ## 7. Reproducibility
 
-What a judge needs to get your numbers back: hardware, runtime, seeds, and the
-exact commit. `make run` should do the rest.
+- `make run` (Docker, no GPU) runs four steps:
+  1. unit tests;
+  2. re-scoring of the shipped raw Apertus outputs for dev (exactly the numbers above, no API needed);
+  3. the model-free baseline;
+  4. rebuilding the submitted test predictions from the shipped raw outputs.
+
+  With `LLM_API_KEY` set it also runs a live Apertus prediction and evaluation on `LIVE_LIMIT` dev documents per language.
+- `make predict-test` regenerates the test predictions (168 × 3 calls).
+- Apertus output at temperature 0 is not perfectly deterministic on the hosted endpoint. That is why the raw responses are shipped and all scores are recomputed from them.
 
 ## 8. Next steps
 
-What you would build with another month.
+- **Sentence alignment before prompting.** Align with the LLM or embeddings, then ask per aligned pair. This should improve both recall and the "missing" false positives.
+- **Calibrate severities per language** on dev.
+- **Try 8B with more samples** for an on-prem budget.
+- **Ship a signed MV3 build:** declarativeNetRequest for PDFs, plus a "report this discrepancy to the authority" button that drafts a correction request with the citation.
 
 ## License
 
-Creative Commons Attribution 4.0 (CC-BY-4.0). All HackApertus projects are open-sourced.
+Creative Commons Attribution 4.0 (CC-BY-4.0). pdf.js (Apache-2.0) is bundled in `src/extension/pdf/lib/` with its licence.
 
 ## References
+
+[1] Wastl et al. *SwissGov-RSD: A Human-annotated, Cross-lingual Benchmark for Token-level Recognition of Semantic Differences Between Related Documents.* arXiv:2512.07538 / ACL 2026. https://arxiv.org/abs/2512.07538

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RöstiBridge settings</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 16px; min-width: 320px; max-width: 560px; color: #1b1b1b; }
+    h1 { font-size: 18px; margin: 0 0 4px; color: #d52b1e; }
+    p.sub { margin: 0 0 14px; color: #555; }
+    label { display: block; margin: 10px 0 2px; font-weight: 600; }
+    input, select { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid #bbb; border-radius: 4px; }
+    .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+    .row input { width: auto; }
+    button { margin-top: 14px; padding: 6px 16px; background: #d52b1e; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    #msg { margin-left: 8px; color: #2a7a2a; }
+    small { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>RöstiBridge</h1>
+  <p class="sub">Flags meaning differences between language versions of Swiss official pages, using Apertus.</p>
+  <label class="row"><input id="enabled" type="checkbox"> Enabled</label>
+  <label for="apiKey">Apertus API key</label>
+  <input id="apiKey" type="password" autocomplete="off" placeholder="stored only in this browser">
+  <small>Sent only to the endpoint below. Page scripts never see it.</small>
+  <label for="baseUrl">Endpoint (OpenAI-compatible)</label>
+  <input id="baseUrl" type="url">
+  <label for="model">Model</label>
+  <select id="model">
+    <option value="swiss-ai/Apertus-v1.5-70B">Apertus 1.5 70B (best)</option>
+    <option value="swiss-ai/Apertus-v1.5-8B">Apertus 1.5 8B (fast, on-prem)</option>
+  </select>
+  <label for="explainLang">Explanations in</label>
+  <select id="explainLang">
+    <option value="en">English</option><option value="de">Deutsch</option><option value="fr">Français</option><option value="it">Italiano</option>
+  </select>
+  <label for="minSeverity">Show differences from severity</label>
+  <select id="minSeverity">
+    <option value="1">1 – everything</option><option value="2">2 – subtle and up</option><option value="3">3 – partial meaning change and up</option><option value="4">4 – clear factual differences only</option>
+  </select>
+  <button id="save">Save</button><span id="msg"></span>
+  <script src="options.js"></script>
+</body>
+</html>
