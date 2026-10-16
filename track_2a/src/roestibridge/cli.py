@@ -141,6 +141,31 @@ def cmd_relabel(a) -> None:
             print(f"relabelled {lang}: {len(items)} items", file=sys.stderr)
 
 
+def cmd_export(a) -> None:
+    """Merge dev + test predictions into the official full-set order (admin_<lang>_0 … _223) and file
+    naming of ZurichNLP/SwissGov-RSD scripts/evaluate_predictions_admin.py: <prefix><lang>.jsonl.jsonl.
+    Every document must be present; a missing one is an error, never a silent zero row."""
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
+    for lang in LANGS:
+        rows = {}
+        for d in (a.dev, a.test):
+            for x in (Path(d) / f"predictions_{lang}.jsonl").read_text(encoding="utf-8").splitlines():
+                if x.strip():
+                    r = json.loads(x)
+                    rows[r["id"]] = r
+        ids = [it["id"] for split in ("dev", "test") for it in load(split, lang)]
+        missing = [i for i in ids if i not in rows]
+        if missing:
+            sys.exit(f"[{lang}] {len(missing)} documents have no prediction, e.g. {missing[:3]}")
+        ids.sort(key=lambda s: int(s.rsplit("_", 1)[1]))
+        path = out / f"{a.prefix}{lang}.jsonl.jsonl"
+        with path.open("w", encoding="utf-8") as fh:
+            for i in ids:
+                fh.write(json.dumps(rows[i], ensure_ascii=False) + "\n")
+        print(f"[{lang}] {len(ids)} documents -> {path}", file=sys.stderr)
+
+
 def cmd_baseline(a) -> None:
     if a.split == "test":
         sys.exit("refusing to evaluate on the test split")
@@ -176,6 +201,11 @@ def main(argv=None) -> None:
     e = sub.add_parser("evaluate")
     e.add_argument("--split", default="dev")
     e.add_argument("--pred", required=True)
+    ex = sub.add_parser("export")
+    ex.add_argument("--dev", required=True)
+    ex.add_argument("--test", required=True)
+    ex.add_argument("--out", required=True)
+    ex.add_argument("--prefix", default="RoestiBridge_Apertus-70B_admin_")
     rl = sub.add_parser("relabel")
     rl.add_argument("--pred", required=True)
     b = sub.add_parser("baseline")
@@ -191,7 +221,7 @@ def main(argv=None) -> None:
     if a.cmd == "download":
         download()
     else:
-        {"predict": cmd_predict, "evaluate": cmd_evaluate, "relabel": cmd_relabel, "baseline": cmd_baseline, "compare": cmd_compare}[a.cmd](a)
+        {"predict": cmd_predict, "evaluate": cmd_evaluate, "relabel": cmd_relabel, "export": cmd_export, "baseline": cmd_baseline, "compare": cmd_compare}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -44,7 +44,15 @@ make predict-test # full test-split prediction (168 docs x 3 samples) with the f
 
 Environment: `LLM_NAME`, `LLM_BASE_URL`, `LLM_API_KEY` (as in the template). `LIVE_LIMIT` sets the number of documents per language for the live run (default 5).
 
-**Submitted predictions:** `predictions/test_70b_n3/predictions_{de,fr,it}.jsonl`. They use the `EncoderPrediction` schema of the official `evaluation/utils.py` (`id, text_a, text_b, labels_a, labels_b`). Raw Apertus outputs, with token usage, are in `raw_*.jsonl` next to them.
+Requirements: Docker only (no GPU). An API key is needed only for live Apertus runs: `make run` re-scores the shipped outputs without one. No model weights are needed; inference uses the CSCS-hosted `swiss-ai/Apertus-v1.5-70B` or any OpenAI-compatible Apertus endpoint.
+
+**Submitted predictions:** `predictions/submission/RoestiBridge_Apertus-70B_admin_{de,fr,it}.jsonl.jsonl`. Each file covers all 224 documents in the full-set order, as the UZH Q&A asks: dev (168) and test (56), by `admin_<lang>_<n>`. They use the official `EncoderPrediction` schema (`id, text_a, text_b, labels_a, labels_b`) and naming, so the official script reads them directly:
+
+```bash
+python -m scripts.evaluate_predictions_admin <path>/RoestiBridge_Apertus-70B_admin_ --split test
+```
+
+The per-split sources, with the raw Apertus answers and token usage, are in `predictions/dev_70b_n3_full/` and `predictions/test_70b_n3/`.
 
 | Dev subset (40 docs × 3 pairs), token-level Spearman | DE | FR | IT | macro |
 |---|---|---|---|---|
@@ -52,6 +60,8 @@ Environment: `LLM_NAME`, `LLM_BASE_URL`, `LLM_API_KEY` (as in the template). `LI
 | Apertus-70B, 1 sample, raw spans | 0.136 | 0.056 | 0.096 | 0.096 |
 | + severity ≥ 2, omissions = 1.0, number prior | 0.159 | 0.074 | 0.104 | 0.112 |
 | **+ 3-sample self-consistency (submitted)** | **0.191** | **0.077** | **0.125** | **0.131** |
+
+On the **full dev split** (168 documents per language) the submitted setting scores **DE 0.210, FR 0.165, IT 0.204, macro 0.193**, against 0.095 for the number baseline. These numbers come from the **official UZH scorer** (`scripts/evaluate_predictions_admin.py --split dev`), which gives exactly the values of our own `roestibridge evaluate`.
 
 The test labels were never read: `evaluate --split test` refuses to run. See [technical_report.md](technical_report.md) for the method, ablations and limitations.
 

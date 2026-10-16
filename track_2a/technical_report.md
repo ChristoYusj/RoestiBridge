@@ -9,7 +9,7 @@
 
 Swiss authorities publish the same page in up to four languages, and the versions do not always say the same thing: sentences are dropped, numbers or deadlines change, or "must" becomes "may". RöstiBridge brings token-level recognition of semantic differences (RSD) to the reader. It is a Firefox extension that highlights passages of an official page (federal, cantonal, RTS news, or a parliamentary PDF) whose meaning may differ from the reference language version. Hovering a highlight shows the other version's excerpt as a citation and an Apertus explanation.
 
-The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-70B reports difference spans, which are projected onto tokens; 3-sample self-consistency averages them. On a 120-document dev subset this gives a macro token-level Spearman of **0.131**, against 0.083 for a model-free number-mismatch baseline and 0.096 for the raw single-sample spans. Test-split predictions (168 documents) are in `predictions/test_70b_n3/`.
+The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-70B reports difference spans, which are projected onto tokens; 3-sample self-consistency averages them. On the full dev split (504 document pairs) the official UZH scorer gives a macro token-level Spearman of **0.193** (DE 0.210, FR 0.165, IT 0.204), against 0.095 for a model-free number-mismatch baseline. On the 120-document subset used for development the gain is from 0.096 for raw single-sample spans to 0.131. The submission files in `predictions/submission/` cover all 224 documents per language in the official full-set order.
 
 ## 2. Architecture
 
@@ -49,13 +49,13 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
   3. turning an RTS headline into German search queries and deciding whether an SRF article is the same story;
   4. picking the translated sibling of a parliamentary document.
 - **Prompt:** `src/extension/shared/prompt.json` (`rb-prompt-v1`). The system prompt defines what counts as a difference (omission/addition, numbers/dates, obligation/scope, legal terms, actionable nuance) and what does not (grammar, word order, free translation). It asks for exact, short excerpts.
-- **Benchmark settings:** temperature 0 for the first sample and 0.7 for samples 2–3, `max_tokens` 2000, one call per document pair. Token usage (from the API) is about 0.82M prompt and 0.25M completion tokens for the 3-sample test run (`raw_*.jsonl` → `usage`).
+- **Benchmark settings:** temperature 0 for the first sample and 0.7 for samples 2–3, `max_tokens` 2000, one call per document pair. Token usage (from the API) is about 0.82M prompt and 0.25M completion tokens for the 3-sample test run, about 4.9k prompt + 1.5k completion tokens per document pair (`raw_*.jsonl` → `usage`).
 - **No other model is used** anywhere in the pipeline or for evaluation.
 
 ## 4. Data
 
 - **SwissGov-RSD** [1] (`ZurichNLP/SwissGov-RSD` on Hugging Face) is downloaded at run time into `data/swissgov-rsd/` and is not committed.
-- Development used a deterministic, evenly spaced **40-document subset of the dev split per language** (`--limit 40`, 120 pairs) to stay within the API budget.
+- Development used a deterministic, evenly spaced **40-document subset of the dev split per language** (`--limit 40`, 120 pairs) to stay within the API budget. After freezing, the remaining dev documents were predicted with the same setting, because the UZH Q&A asks for predictions in the full-set order (224 per language).
 - **The test split was never evaluated or inspected:** `evaluate --split test` exits with an error.
 - Test predictions were produced once with the prompt and post-processing frozen on dev.
 - The extension processes public government pages on the fly and stores nothing beyond a local cache of model answers.
@@ -63,7 +63,7 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
 
 ## 5. Evaluation
 
-**Metric:** the official one. For each language pair, all tokens of side A and side B with gold ≠ −1 are pooled (predictions are padded or truncated to the gold length), global Spearman is computed, and the macro average is taken over EN–DE/FR/IT. Our implementation matches `scipy.stats.spearmanr` on the pooled vectors (checked in development).
+**Metric:** the official one. For each language pair, all tokens of side A and side B with gold ≠ −1 are pooled (predictions are padded or truncated to the gold length), global Spearman is computed, and the macro average is taken over EN–DE/FR/IT. Our implementation matches `scipy.stats.spearmanr` on the pooled vectors. It also matches the official `scripts/evaluate_predictions_admin.py` exactly on the full dev split (DE 0.210 / FR 0.165 / IT 0.204; Kendall's τ 0.197 / 0.154 / 0.187).
 
 | Setup (dev subset, 40 docs/pair) | DE | FR | IT | **macro** |
 |---|---|---|---|---|
@@ -72,6 +72,8 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
 | + drop severity 1, omission/addition = 1.0 | 0.157 | 0.069 | 0.100 | 0.109 |
 | + number-mismatch prior (max) | 0.159 | 0.074 | 0.104 | 0.112 |
 | **+ 3 samples, averaged (submitted)** | **0.191** | **0.077** | **0.125** | **0.131** |
+| *Full dev split (168 docs/pair), number baseline* | 0.132 | 0.065 | 0.087 | 0.095 |
+| ***Full dev split (168 docs/pair), submitted setting, official scorer*** | **0.210** | **0.165** | **0.204** | **0.193** |
 
 **Ablations** (no extra API calls; `python -m roestibridge.ablate`):
 
