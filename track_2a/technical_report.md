@@ -80,14 +80,17 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
 - **Span projection is reliable:** 376 of 382 returned excerpts were located in the token sequence.
 - **FR is the weakest pair.** The FR documents are longer (461 vs 363 tokens on average for DE) and the FR texts carry the most `�` corruption.
 
-**Extension checks** (live sites, 16 Oct 2026):
+**Extension checks.** These ran end to end in Firefox 158 (headless, WebDriver BiDi via puppeteer-core) on the packaged extension against live sites on 16 Oct 2026. Apertus-70B was used throughout. The counts vary between runs because the model is not deterministic.
 
 | Case | Result |
 |---|---|
-| bag.admin.ch FR → DE | Counterpart found via Apertus slug matching (`agenda-soins-de-base` → `agenda-grundversorgung`, `soins-palliatifs` → `palliative-care`); 5–9 differences, mostly list items present in only one version |
-| Fedlex consultation PDF (DE↔FR) | 15 differences, including articles where the French reads "Ne concerne que le texte allemand" while the German changes the provision; 5 located on the text layer |
-| parlament.ch DE PDF → FR | Found via OpenParlData affair 234959 (`Kinderabzug = 12'000 Franken` → `déduction pour enfants = 12 000 francs`); the two tables agree (0 differences) |
-| RTS → SRF | Amaudruz stories linked to SRF's candidacy article; stories SRF did not cover fall back to search links |
+| bfe.admin.ch/fr → DE | 3 highlighted, e.g. a paragraph on the IAEA General Conference that is missing in the German version |
+| be.ch/fr → DE (bilingual canton) | 1 highlighted, a tone shift ("beau palmarès" vs "brillieren") |
+| bag.admin.ch FR → DE | Counterpart found via Apertus slug matching (`agenda-soins-de-base` → `agenda-grundversorgung`); 0–9 differences depending on the run, mostly list items |
+| ch.ch/it → DE and FR (federal: both) | 0 differences on the homepage |
+| RTS Amaudruz article → SRF | SRF story found and linked ("SVP-Nationalrätin Céline Amaudruz will Bundesrätin werden"); 8 differences highlighted |
+| parlament.ch PDF link (DE) | Redirected into the RöstiBridge viewer; FR counterpart found via OpenParlData affair 234959 (`Kinderabzug = 12'000 Franken` → `déduction pour enfants = 12 000 francs`); the tables agree (0 differences) |
+| Fedlex consultation PDF (DE↔FR) | 16 differences, including articles where the French reads "Ne concerne que le texte allemand" while the German changes the provision; 5 located on the text layer |
 
 ## 6. Limitations
 

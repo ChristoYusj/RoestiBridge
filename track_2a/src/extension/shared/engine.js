@@ -46,7 +46,7 @@
   }
 
   async function chat(messages, cfg) {
-    const body = { model: cfg.model, messages, temperature: 0, max_tokens: 2000, response_format: { type: "json_object" } };
+    const body = { model: cfg.model, messages, temperature: 0, max_tokens: cfg.maxTokens || 2000, response_format: { type: "json_object" } };
     for (let attempt = 0; attempt < 3; attempt++) {
       const r = await fetch(cfg.baseUrl.replace(/\/$/, "") + "/chat/completions", {
         method: "POST",
@@ -58,7 +58,10 @@
         return j.choices[0].message.content || "";
       }
       if (r.status === 400 && body.response_format) { delete body.response_format; continue; }
-      if (r.status === 401 || r.status === 403) throw new Error("API key rejected (" + r.status + ")");
+      if (r.status === 401 || r.status === 403) {
+        const detail = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
+        throw new Error("API key rejected (" + r.status + ")" + (detail ? ": " + detail : ""));
+      }
       await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
     }
     throw new Error("Apertus endpoint unavailable");

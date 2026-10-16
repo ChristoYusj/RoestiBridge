@@ -15,7 +15,13 @@ document.getElementById("save").addEventListener("click", async () => {
     const el = document.getElementById(k);
     out[k] = el.type === "checkbox" ? el.checked : k === "minSeverity" ? Number(el.value) : el.value.trim();
   }
+  // tolerate a pasted .env line or an "Authorization: Bearer …" value
+  out.apiKey = out.apiKey.replace(/^(LLM_API_KEY\s*=\s*|Authorization:\s*)?(Bearer\s+)?/i, "").replace(/^["']|["']$/g, "");
   await browser.storage.local.set(out);
-  document.getElementById("msg").textContent = "Saved";
-  setTimeout(() => (document.getElementById("msg").textContent = ""), 1500);
+  const msg = document.getElementById("msg");
+  msg.style.color = "#555";
+  msg.textContent = "Saved, testing the key…";
+  const r = await browser.runtime.sendMessage({ type: "testKey" });
+  msg.style.color = r && r.ok ? "#2a7a2a" : "#a3170c";
+  msg.textContent = r && r.ok ? `Saved, key works with ${r.model}` : `Saved, but the endpoint refused: ${(r && r.error) || "no answer"}`;
 });

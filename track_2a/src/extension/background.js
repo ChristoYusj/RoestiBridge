@@ -129,7 +129,7 @@ async function findCounterpart(msg) {
   const u = new URL(msg.url);
   const [ha, hb] = await Promise.all([fetchText(`${u.origin}/${msg.langA}`), fetchText(`${u.origin}/${msg.langB}`)]);
   const a = orderedPaths(ha.text + (msg.pageHtml || ""), msg.langA), b = orderedPaths(hb.text, msg.langB);
-  if (!b.length) return { url: null };
+  if (!b.length) return { url: null, reason: `no /${msg.langB}/ paths on ${u.origin}/${msg.langB} (HTTP ${hb.status})` };
   const idx = a.indexOf(u.pathname.replace(/\/$/, ""));
   const lo = idx < 0 ? 0 : Math.max(0, idx - 40);
   const cands = b.slice(lo, lo + 120);
@@ -145,7 +145,7 @@ async function findCounterpart(msg) {
     const j = JSON.parse(content.slice(content.indexOf("{"), content.lastIndexOf("}") + 1));
     path = cands[Number(j.number) - 1] || null;
   } catch (e) { /* ignore */ }
-  if (!path) return { url: null };
+  if (!path) return { url: null, reason: "Apertus found no matching page" };
   return { url: u.origin + path };
 }
 
@@ -176,9 +176,14 @@ browser.runtime.onMessage.addListener((msg) => {
   const run = {
     findCounterpart: () => findCounterpart(msg),
     openOptions: () => browser.runtime.openOptionsPage().then(() => ({})),
+    testKey: async () => {
+      const cfg = await RBEngine.settings();
+      await RBEngine.chat([{ role: "user", content: "Reply with {\"ok\": true}" }], Object.assign({}, cfg, { maxTokens: 8 }));
+      return { ok: true, model: cfg.model };
+    },
     compareBlocks: () => compareBlocks(msg),
     fetchText: () => fetchText(msg.url),
-    srfSearch: () => srfSearch(msg.query),
+    srfSearch: () => srfSearch(msg.queries || msg.query),
     germanQuery: () => germanQuery(msg.title),
     pickSameStory: () => pickSameStory(msg.title, msg.candidates),
     findPdfCounterpart: () => findPdfCounterpart(msg),

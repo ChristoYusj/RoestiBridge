@@ -32,14 +32,20 @@
       url = found && found.url;
       page = url ? await browser.runtime.sendMessage({ type: "fetchText", url }) : null;
       doc = page && page.ok ? new DOMParser().parseFromString(page.text, "text/html") : null;
+      if (!doc) {
+        const why = (found && (found.error || found.reason)) || (page ? "HTTP " + page.status : "no match");
+        summary.push(`${t.toUpperCase()}: no version found (${RBHighlight.esc(why)})`);
+        continue;
+      }
     }
-    if (!doc) { summary.push(`${t.toUpperCase()}: no version found`); continue; }
     const theirs = RBExtract.blocks(doc);
     const res = await browser.runtime.sendMessage({ type: "compareBlocks", blocksA: mine, blocksB: theirs, langA: lang, langB: t, cacheKey: location.href + ">" + page.url });
     if (res.error) { summary.push(`${t.toUpperCase()}: ${RBHighlight.esc(res.error)}`); continue; }
     const diffs = res.differences.map((d) => Object.assign({}, d, { lang: t, source: page.url }));
     const n = RBHighlight.apply(root, diffs);
-    summary.push(`<a href="${RBHighlight.esc(page.url)}">${t.toUpperCase()}</a>: ${n} flagged`);
+    const onlyThere = diffs.filter((d) => !d.a).length;
+    const extra = [onlyThere ? `${onlyThere} only in ${t.toUpperCase()}` : "", diffs.length - onlyThere - n > 0 ? `${diffs.length - onlyThere - n} not locatable` : ""].filter(Boolean).join(", ");
+    summary.push(`<a href="${RBHighlight.esc(page.url)}">${t.toUpperCase()}</a>: ${n} flagged${extra ? " (" + extra + ")" : ""}`);
   }
   RBHighlight.status(summary.join(" · "), "done");
 })();

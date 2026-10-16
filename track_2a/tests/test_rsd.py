@@ -74,6 +74,18 @@ class TestExtensionFiles(unittest.TestCase):
         for f in files:
             self.assertTrue((EXT / f).exists(), f)
 
+    def test_every_sent_message_has_a_background_handler(self):
+        import re
+        bg = (EXT / "background.js").read_text(encoding="utf-8")
+        handlers = set(re.findall(r"^\s{4}(\w+): \(\) =>|^\s{4}(\w+): async", bg, re.M))
+        handlers = {a or b for a, b in handlers}
+        senders = list((EXT / "content").glob("*.js")) + [EXT / "pdf" / "viewer.js", EXT / "options" / "options.js"]
+        sent = set()
+        for p in senders:
+            sent |= set(re.findall(r'sendMessage\(\{\s*type: "(\w+)"', p.read_text(encoding="utf-8")))
+        self.assertTrue(sent, "no messages found")
+        self.assertEqual(sent - handlers, set())
+
     def test_no_control_characters_in_sources(self):
         # guards against heredoc accidents turning "\b" into a backspace character
         for p in list(EXT.rglob("*.js")) + list((EXT.parent / "roestibridge").rglob("*.py")):
