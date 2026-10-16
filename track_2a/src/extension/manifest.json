@@ -1,12 +1,12 @@
 {
   "manifest_version": 2,
   "name": "RöstiBridge",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "description": "Flags meaning differences between language versions of Swiss government pages, RTS articles and parliamentary PDFs, using Apertus.",
   "browser_specific_settings": {
     "gecko": { "id": "roestibridge@hackapertus.local", "strict_min_version": "115.0" }
   },
-  "icons": { "48": "icons/icon.svg", "96": "icons/icon.svg" },
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "96": "icons/icon-96.png", "128": "icons/icon-128.png" },
   "permissions": [
     "storage",
     "webRequest",
@@ -36,6 +36,6 @@
     }
   ],
   "options_ui": { "page": "options/options.html", "open_in_tab": true },
-  "browser_action": { "default_title": "RöstiBridge", "default_icon": "icons/icon.svg", "default_popup": "options/options.html" },
+  "browser_action": { "default_title": "RöstiBridge", "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png" }, "default_popup": "options/options.html" },
   "web_accessible_resources": ["shared/prompt.json", "pdf/*", "content/style.css"]
 }

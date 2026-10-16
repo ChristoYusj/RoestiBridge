@@ -5,6 +5,7 @@
   if (!h1 || h1.textContent.trim().length < 15) return;      // not an article/video page
   const st = await browser.runtime.sendMessage({ type: "settings" });
   if (!st || !st.enabled) return;
+  RBHighlight.setLang(st.explainLang);
   const isVideo = /\/play\/|\/video\//.test(location.pathname) || !!document.querySelector("video");
   const title = h1.textContent.replace(/\s+/g, " ").trim();
   const esc = RBHighlight.esc;

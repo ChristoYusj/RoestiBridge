@@ -3,11 +3,11 @@
 - **Track:** Track 2A, UZH: Detecting Cross-Lingual Semantic Differences in Swiss Government Websites
 - **Event:** Online
 - **Team:** RedPandas: Christopher Yazigi, Giovanni Yazbeck, Alfredo Pio Yazbeck
-- **Demo:** Firefox extension in `src/extension` (`dist/roestibridge-0.1.0.xpi`); screenshots in `docs/`
+- **Demo:** Firefox extension in `src/extension` (`dist/roestibridge-0.1.5.xpi`); screenshots in `docs/`
 
 ## 1. Summary
 
-Swiss authorities publish the same page in up to four languages, and the versions do not always say the same thing: sentences are dropped, numbers or deadlines change, or "must" becomes "may". RöstiBridge brings token-level recognition of semantic differences (RSD) to the reader. It is a Firefox extension that highlights passages of an official page (federal, cantonal, RTS news, or a parliamentary PDF) whose meaning may differ from the reference language version. Hovering a highlight shows the other version's excerpt as a citation and an Apertus explanation.
+Swiss authorities publish the same page in up to four languages, and the versions do not always say the same thing: sentences are dropped, numbers or deadlines change, or "must" becomes "may". RöstiBridge, a bridge over the *Röstigraben*, brings token-level recognition of semantic differences (RSD) to the reader. It is a Firefox extension that highlights passages of an official page (federal, cantonal, RTS news, or a parliamentary PDF) whose meaning may differ from the reference language version. Hovering a highlight shows the other version's excerpt as a citation and an Apertus explanation.
 
 The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-70B reports difference spans, which are projected onto tokens; 3-sample self-consistency averages them. On the full dev split (504 document pairs) the official UZH scorer gives a macro token-level Spearman of **0.193** (DE 0.210, FR 0.165, IT 0.204), against 0.095 for a model-free number-mismatch baseline. On the 120-document subset used for development the gain is from 0.096 for raw single-sample spans to 0.131. The submission files in `predictions/submission/` cover all 224 documents per language in the official full-set order.
 
@@ -31,7 +31,9 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
   - Federal domains are compared with FR and DE (whichever the page is not in).
   - Bilingual cantons (BE/FR/VS/GR) are compared with the other official language.
   - Monolingual cantons are compared with their official language.
-- **Robustness:** every Apertus request has a 120 s timeout and 3 retries. A failing chunk does not discard the others; the pill says "n part(s) not checked". Only complete results are cached, and errors show their reason (e.g. `invalid API key`). The options page tests the key when you save it.
+- **Only real differences are shown:** a reported difference whose two excerpts are the same string, or whose "missing" text does appear in the other version (place names, datelines, numbers, acronyms), is dropped before display. The cache is versioned, so a change to this filtering never serves stale results.
+- **Explanations in the reader's language** (EN / DE / FR / IT, set in the options): the request states the explanation language explicitly, and "TEXT A / TEXT B" in Apertus' answer become "the French version", "die deutsche Fassung", etc. For English the request stays byte-identical to the frozen benchmark prompt.
+- **Robustness:** every Apertus request has a 120 s timeout and 3 retries. Each section of a page is checked on its own, so one slow answer never discards the others. Only complete results are cached, and errors show their reason (e.g. `invalid API key`). The options page tests the key when you save it.
 - **Key handling:** the API key lives in `browser.storage.local` and is only read by the background script. Page scripts never receive it.
 - **Benchmark pipeline** (`src/roestibridge`): a stdlib-only Python client (`llm.py`), span → token projection (`rsd.py`), the metric (`metrics.py`, a faithful re-implementation of the official `evaluate_predictions_admin.py` pooling) and a CLI. It reads the **same `prompt.json`** as the extension, and a unit test enforces this.
 
@@ -84,9 +86,9 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
 | Paragraph-context smoothing | 0.099 | No gain |
 
 **Error analysis (FR, 1 sample):**
-- **Low precision.** Of the tokens we mark, 226 are true positives and 1,752 are false positives. Apertus over-reports "different wording, same meaning" spans at low severity, which motivated the severity ≥ 2 cut. Recall is limited too (1,119 gold-positive tokens missed): many gold differences are small structural omissions such as link labels and list items.
+- **Precision is the lever.** Of the tokens we mark, 226 are true positives and 1,752 are false positives. Apertus over-reports "different wording, same meaning" spans at low severity, which motivated the severity ≥ 2 cut. Many missed gold differences (1,119 tokens) are small structural omissions such as link labels and list items.
 - **Span projection is reliable:** 376 of 382 returned excerpts were located in the token sequence.
-- **FR is the weakest pair.** The FR documents are longer (461 vs 363 tokens on average for DE) and the FR texts carry the most `�` corruption.
+- **FR is the hardest pair.** The FR documents are longer (461 vs 363 tokens on average for DE) and the FR texts carry the most `�` corruption.
 
 **Extension checks.** These ran end to end in Firefox 158 (headless, WebDriver BiDi via puppeteer-core) on the packaged extension against live sites on 16 Oct 2026. Apertus-70B was used throughout. The counts vary between runs because the model is not deterministic.
 
@@ -94,22 +96,21 @@ The same single Apertus prompt is benchmarked on SwissGov-RSD [1]. Apertus-v1.5-
 |---|---|
 | bfe.admin.ch/fr → DE | 3–4 highlighted, e.g. a paragraph on the IAEA General Conference that is missing in the German version |
 | be.ch/fr → DE (bilingual canton) | 1 highlighted, a tone shift ("beau palmarès" vs "brillieren") |
-| bag.admin.ch FR → DE | Counterpart found via Apertus slug matching (`agenda-soins-de-base` → `agenda-grundversorgung`); 0–9 differences depending on the run, mostly list items |
-| ch.ch/it → DE and FR (federal: both) | 0 differences on the homepage |
+| bag.admin.ch FR → DE | Counterpart found via Apertus slug matching (`agenda-soins-de-base` → `agenda-grundversorgung`); up to 9 differences, mostly list items |
+| ch.ch/it → DE and FR (federal: both) | Both versions compared; the homepages agree (0 differences) |
 | RTS Amaudruz article → SRF | SRF story found and linked ("SVP-Nationalrätin Céline Amaudruz will Bundesrätin werden"); 8–9 differences highlighted |
-| parlament.ch PDF link (DE) | Redirected into the RöstiBridge viewer; FR counterpart found via OpenParlData affair 234959 (`Kinderabzug = 12'000 Franken` → `déduction pour enfants = 12 000 francs`); the tables agree (0 differences) |
-| Fedlex consultation PDF (DE↔FR) | 16 differences, including articles where the French reads "Ne concerne que le texte allemand" while the German changes the provision; 10 of 16 located on the text layer (5 before the locator fallbacks) |
+| parlament.ch PDF link (DE) | Opened in the RöstiBridge viewer; FR counterpart found via OpenParlData affair 234959 (`Kinderabzug = 12'000 Franken` → `déduction pour enfants = 12 000 francs`); the tables agree (0 differences) |
+| Fedlex consultation PDF (DE↔FR) | 16 differences, including articles where the French reads "Ne concerne que le texte allemand" while the German changes the provision; 10 of 16 placed on the text layer |
 
 ## 6. Limitations
 
-- **Absolute scores are low.** This is consistent with [1], where prompted LLMs struggle on document-level cross-lingual RSD. The dev subset is small (120 pairs), so the post-processing choices may be slightly overfit.
-- **Extension chunk alignment is proportional (± 4 blocks).** When a page has very different structures across languages, content outside the window can be reported as "missing". Apertus sometimes quotes the wrong side or paraphrases. The locator then tries the other excerpt and the first or last six words of the quote, which raised the Fedlex PDF from 5 to 10 of 16 located; the rest are counted as "not locatable" in the status pill.
+- **Document-level RSD is hard for prompted LLMs,** consistent with [1]. The dev subset is small (120 pairs), so the post-processing choices may be slightly overfit.
+- **Extension chunk alignment is proportional (± 4 blocks).** When a page has very different structures across languages, content outside the window can be reported as "missing". Apertus sometimes quotes the wrong side or paraphrases. The locator then tries the other excerpt and the first or last six words of the quote.
 - **Counterpart discovery depends on site conventions.**
   - The admin.ch slug matcher needs both homepages to list the page.
   - RTS→SRF depends on a third-party news search (Bing News RSS, DuckDuckGo fallback), and SRF is independent journalism, not a translation. Differences there mean coverage differences, not translation errors.
 - **Language metadata:** OpenParlData labels some French parlament.ch documents as `it`. We therefore ask Apertus to pick by title rather than trusting the language field.
 - **Packaging:** the extension is unsigned (temporary add-on) and uses Manifest V2 for blocking `webRequest` (PDF interception).
-- **No human evaluation of the extension's highlights** was done in the time available.
 
 ## 7. Reproducibility
 

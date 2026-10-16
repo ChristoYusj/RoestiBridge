@@ -9,6 +9,14 @@
     enabled: true
   };
   let PROMPT = null;
+  const NATIVE = { de: "Deutsch", fr: "français", it: "italiano", rm: "rumantsch", en: "English" };
+  /* "the French version" etc., in the explanation language, to replace TEXT A / TEXT B */
+  const VERSION_OF = {
+    en: { de: "the German version", fr: "the French version", it: "the Italian version", rm: "the Romansh version", en: "the English version" },
+    de: { de: "die deutsche Fassung", fr: "die französische Fassung", it: "die italienische Fassung", rm: "die rätoromanische Fassung", en: "die englische Fassung" },
+    fr: { de: "la version allemande", fr: "la version française", it: "la version italienne", rm: "la version romanche", en: "la version anglaise" },
+    it: { de: "la versione tedesca", fr: "la versione francese", it: "la versione italiana", rm: "la versione romancia", en: "la versione inglese" }
+  };
 
   async function prompt() {
     if (!PROMPT) PROMPT = await (await fetch(browser.runtime.getURL("shared/prompt.json"))).json();
@@ -29,7 +37,14 @@
       .split("{explain_lang}").join(n[explainLang] || explainLang)
       .split("{text_a}").join(textA)
       .split("{text_b}").join(textB);
-    return [{ role: "system", content: p.system }, { role: "user", content: user }];
+    // The template only mentions the explanation language in passing, and the model tends to answer in
+    // English or in the text's language. Stated explicitly for non-English choices; English stays
+    // byte-identical to the frozen benchmark prompt.
+    const insist = explainLang && explainLang !== "en"
+      ? `\n\nIMPORTANT: write every "explanation" value in ${n[explainLang] || explainLang} (${NATIVE[explainLang] || explainLang}), `
+        + `whatever the languages of TEXT A and TEXT B. Keep the "a" and "b" excerpts exactly as they appear in the texts.`
+      : "";
+    return [{ role: "system", content: p.system }, { role: "user", content: user + insist }];
   }
 
   function parseDifferences(content) {
@@ -81,23 +96,39 @@
     throw new Error(lastError);
   }
 
+  /* Language-neutral normal form for "is this excerpt really absent?" checks. */
+  const flat = (s) => String(s || "").toLowerCase()
+    .replace(/[‘’ʼ`´]/g, "'").replace(/[“”«»„]/g, '"').replace(/[‐-―−]/g, "-")
+    .replace(/\s+/g, " ").replace(/^[\s.,;:!?"'()\-]+|[\s.,;:!?"'()\-]+$/g, "");
+
+  /* The model sometimes reports text that is identical in both languages (place names, datelines,
+     numbers, acronyms) as missing from the other version, or quotes the same string on both sides. */
+  function isSpurious(d, textA, textB) {
+    const a = flat(d.a), b = flat(d.b);
+    if (a && b) return a === b;
+    if (a && !b) return a.length >= 3 && flat(textB).includes(a);
+    if (b && !a) return b.length >= 3 && flat(textA).includes(b);
+    return true;                                   // neither side quoted: nothing to show
+  }
+
   /* Compare two texts; returns differences with numeric severity. */
   async function compare(textA, textB, langA, langB) {
     const cfg = await settings();
     if (!cfg.apiKey) throw new Error("Set your Apertus API key in the RöstiBridge options");
     const msgs = await buildMessages(textA, textB, langA, langB, cfg.explainLang);
-    const langName = (await prompt()).lang_names;
+    const versionOf = VERSION_OF[cfg.explainLang] || VERSION_OF.en;
     const diffs = parseDifferences(await chat(msgs, cfg));
     return diffs
       .map((d) => Object.assign({}, d, { severity: Math.min(5, Math.max(1, Math.round(Number(d.severity) || 3))) }))
       .filter((d) => d.severity >= cfg.minSeverity && !/^(no[ _-]?diff|none|same|identical)/i.test(String(d.type || "")))
+      .filter((d) => !isSpurious(d, textA, textB))
       .map((d) => Object.assign(d, {
         // the prompt calls them TEXT A / TEXT B; readers know them by language
         explanation: String(d.explanation || "")
-          .replace(/\bTEXT A\b/g, "the " + (langName[langA] || langA) + " version")
-          .replace(/\bTEXT B\b/g, "the " + (langName[langB] || langB) + " version")
+          .replace(/\b(?:[Tt]he |[Ll][ea] |[Dd]ie |[Dd]er |[Dd]as )?TEXT[EO]? A\b/g, versionOf[langA] || langA)
+          .replace(/\b(?:[Tt]he |[Ll][ea] |[Dd]ie |[Dd]er |[Dd]as )?TEXT[EO]? B\b/g, versionOf[langB] || langB)
       }));
   }
 
-  root.RBEngine = { compare, settings, parseDifferences, buildMessages, chat, DEFAULTS };
+  root.RBEngine = { compare, settings, parseDifferences, buildMessages, chat, isSpurious, DEFAULTS };
 })(typeof window !== "undefined" ? window : self);

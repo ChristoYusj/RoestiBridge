@@ -4,6 +4,7 @@
   if (!info || window.top !== window) return;
   const st = await browser.runtime.sendMessage({ type: "settings" });
   if (!st || !st.enabled) return;
+  RBHighlight.setLang(st.explainLang);
 
   const lang = RBExtract.pageLang(document);
   const targets = RBSites.targetLanguages(info, lang);
@@ -11,12 +12,12 @@
   const mine = RBExtract.blocks(document);
   if (mine.join(" ").length < 150) return;      // nothing substantial to compare
   if (!st.hasKey) {
-    const pill = RBHighlight.status("set your Apertus key in the add-on options to check translations (click)", "warn");
-    pill.addEventListener("click", () => browser.runtime.sendMessage({ type: "openOptions" }));
+    const pill = RBHighlight.status("Set your Apertus key in the add-on options to check translations (click here).", "warn");
+    pill.querySelector(".rb-msg").addEventListener("click", () => browser.runtime.sendMessage({ type: "openOptions" }));
     return;
   }
 
-  RBHighlight.status(`checking against ${targets.map((t) => t.toUpperCase()).join(" + ")}…`, "busy");
+  RBHighlight.status(`Comparing with the ${targets.map((t) => t.toUpperCase()).join(" + ")} version…`, "busy");
   const root = RBExtract.mainRoot(document);
   const summary = [];
   for (const t of targets) {
@@ -44,9 +45,11 @@
     const diffs = res.differences.map((d) => Object.assign({}, d, { lang: t, source: page.url }));
     const n = RBHighlight.apply(root, diffs);
     const onlyThere = diffs.filter((d) => !d.a).length;
-    const extra = [onlyThere ? `${onlyThere} only in ${t.toUpperCase()}` : "", diffs.length - onlyThere - n > 0 ? `${diffs.length - onlyThere - n} not locatable` : "",
-      res.failedChunks ? `${res.failedChunks} part(s) not checked` : ""].filter(Boolean).join(", ");
-    summary.push(`<a href="${RBHighlight.esc(page.url)}">${t.toUpperCase()}</a>: ${n} flagged${extra ? " (" + extra + ")" : ""}`);
+    const lost = diffs.length - onlyThere - n;
+    const extra = [onlyThere ? `${onlyThere} only in the ${t.toUpperCase()} version` : "", lost > 0 ? `${lost} not found on this page` : "",
+      res.failedChunks ? `${res.failedChunks} section${res.failedChunks > 1 ? "s" : ""} not checked` : ""].filter(Boolean).join(", ");
+    summary.push(`vs <a href="${RBHighlight.esc(page.url)}" target="_blank" rel="noopener">${t.toUpperCase()}</a>: `
+      + `${n ? `${n} difference${n > 1 ? "s" : ""} highlighted` : "no differences highlighted"}${extra ? " (" + extra + ")" : ""}`);
   }
-  RBHighlight.status(summary.join(" · "), "done");
+  RBHighlight.status(summary.join("<br>"), "done");
 })();

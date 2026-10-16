@@ -109,6 +109,7 @@ async function compareWith(mine, myLang, otherUrl, knownLang) {
   const myLang = guessLang(file) || "de";
   $("go").onclick = () => $("other").value && compareWith(mine, myLang, $("other").value).catch((e) => state(e.message));
   const st = await browser.runtime.sendMessage({ type: "settings" });
+  RBHighlight.setLang(st.explainLang);
   if (!st.hasKey) { state("set your Apertus key in the add-on options"); return; }
   const target = myLang === "de" ? "fr" : "de";
   state("looking for the " + target.toUpperCase() + " version…");

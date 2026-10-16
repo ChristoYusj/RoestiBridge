@@ -1,6 +1,23 @@
 /* Highlighting of difference excerpts + hover card + status pill. Shared by gov, RTS and PDF views. */
 (function () {
-  const LANG_LABEL = { de: "German", fr: "French", it: "Italian", rm: "Romansh", en: "English" };
+  /* Hover-card wording follows the "Explanations in" setting (setLang). */
+  const UI = {
+    en: { lang: { de: "German", fr: "French", it: "Italian", rm: "Romansh", en: "English" }, version: (l) => `${l} version`,
+      missing: (l) => `Not present in the ${l} version`, source: "source", expl: "Inferred explanation", diff: "difference",
+      types: { omission: "omission", addition: "addition", number: "number", scope: "scope", term: "term", nuance: "nuance" } },
+    de: { lang: { de: "Deutsch", fr: "Französisch", it: "Italienisch", rm: "Rätoromanisch", en: "Englisch" }, version: (l) => `Fassung ${l}`,
+      missing: (l) => `Fehlt in der Fassung ${l}`, source: "Quelle", expl: "Abgeleitete Erklärung", diff: "Unterschied",
+      types: { omission: "Auslassung", addition: "Ergänzung", number: "Zahl", scope: "Tragweite", term: "Begriff", nuance: "Nuance" } },
+    fr: { lang: { de: "allemand", fr: "français", it: "italien", rm: "romanche", en: "anglais" }, version: (l) => `Version ${l}`,
+      missing: (l) => `Absent de la version ${l}`, source: "source", expl: "Explication déduite", diff: "différence",
+      types: { omission: "omission", addition: "ajout", number: "chiffre", scope: "portée", term: "terme", nuance: "nuance" } },
+    it: { lang: { de: "tedesco", fr: "francese", it: "italiano", rm: "romancio", en: "inglese" }, version: (l) => `Versione ${l}`,
+      missing: (l) => `Assente nella versione ${l}`, source: "fonte", expl: "Spiegazione dedotta", diff: "differenza",
+      types: { omission: "omissione", addition: "aggiunta", number: "numero", scope: "portata", term: "termine", nuance: "sfumatura" } }
+  };
+  let ui = UI.en;
+  const langLabel = (l) => ui.lang[l] || l;
+  function setLang(l) { ui = UI[l] || UI.en; }
   const norm = (s) => s.replace(/[‘’ʼ`´]/g, "'").replace(/[“”«»„]/g, '"').replace(/\s+/g, " ").toLowerCase();
 
   function textNodes(root) {
@@ -81,12 +98,12 @@
     const t = ensureTip();
     t.innerHTML = items.map((d) => `
       <div class="rb-entry">
-        <div class="rb-head"><span class="rb-badge rb-sev${d.severity}">${esc(d.type || "difference")} · ${d.severity}/5</span>
-          <span class="rb-lang">${esc(LANG_LABEL[d.lang] || d.lang)} version</span></div>
-        ${d.b ? `<blockquote class="rb-cite" lang="${esc(d.lang)}">“${esc(d.b)}”</blockquote>`
-              : `<blockquote class="rb-cite rb-missing">Not present in the ${esc(LANG_LABEL[d.lang] || d.lang)} version</blockquote>`}
-        ${d.source ? `<a class="rb-src" href="${esc(d.source)}" target="_blank" rel="noopener">source ↗</a>` : ""}
-        <div class="rb-expl"><b>Inferred explanation</b> <span class="rb-ai">Apertus</span><br>${esc(d.explanation)}</div>
+        <div class="rb-head"><span class="rb-badge rb-sev${d.severity}">${esc(ui.types[String(d.type || "").toLowerCase()] || d.type || ui.diff)} · ${d.severity}/5</span>
+          <span class="rb-lang">${esc(ui.version(langLabel(d.lang)))}</span></div>
+        ${d.b ? `<div class="rb-cite" lang="${esc(d.lang)}">“${esc(d.b)}”</div>`
+              : `<div class="rb-cite rb-missing">${esc(ui.missing(langLabel(d.lang)))}</div>`}
+        ${d.source ? `<a class="rb-src" href="${esc(d.source)}" target="_blank" rel="noopener">${esc(ui.source)} ↗</a>` : ""}
+        <div class="rb-expl"><b>${esc(ui.expl)}</b> <span class="rb-ai">Apertus</span><br>${esc(d.explanation)}</div>
       </div>`).join("");
     const r = mark.getBoundingClientRect();
     t.style.display = "block";
@@ -134,12 +151,17 @@
       pill = document.createElement("div");
       pill.className = "rb-pill";
       document.documentElement.appendChild(pill);
-      pill.addEventListener("click", () => pill.classList.toggle("rb-collapsed"));
+      pill.addEventListener("click", (e) => {
+        if (e.target.closest(".rb-x")) pill.remove();
+        else if (e.target.closest(".rb-logo")) pill.classList.toggle("rb-collapsed");
+      });
     }
     pill.dataset.state = state || "info";
-    pill.innerHTML = `<span class="rb-logo">RöstiBridge</span> ${html}`;
+    pill.innerHTML = `<span class="rb-logo" title="Show / hide details">RöstiBridge</span>`
+      + `<span class="rb-msg">${state === "busy" ? '<span class="rb-spin"></span>' : ""}${html}</span>`
+      + `<button class="rb-x" type="button" title="Close" aria-label="Close">×</button>`;
     return pill;
   }
 
-  window.RBHighlight = { apply, status, highlight, registry, esc };
+  window.RBHighlight = { apply, status, highlight, registry, esc, setLang };
 })();
