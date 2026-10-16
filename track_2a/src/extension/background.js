@@ -1,6 +1,7 @@
 /* Background: cross-origin fetches, Apertus calls (key never reaches page scripts), cache, PDF interception. */
 const MAX_CHARS = 16000;   // per page side, keeps one page ~3-5 API calls
 const CHUNK_CHARS = 3500;
+const CACHE_VERSION = 2;
 
 async function hash(s) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -27,7 +28,8 @@ function chunkPairs(blocksA, blocksB) {
 
 async function compareBlocks(msg) {
   const cfg = await RBEngine.settings();
-  const key = "cache:" + (await hash([msg.cacheKey, msg.langA, msg.langB, cfg.model, cfg.explainLang, msg.blocksA.join("|").length].join("~")));
+  // bump CACHE_VERSION whenever post-filtering changes, so stale flags are not served from cache
+  const key = "cache:" + (await hash([CACHE_VERSION, msg.cacheKey, msg.langA, msg.langB, cfg.model, cfg.explainLang, msg.blocksA.join("|").length].join("~")));
   const hit = await browser.storage.local.get(key);
   if (hit[key]) return { differences: hit[key], cached: true };
   const chunks = chunkPairs(msg.blocksA, msg.blocksB);

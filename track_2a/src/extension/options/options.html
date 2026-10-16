@@ -4,21 +4,31 @@
   <meta charset="utf-8">
   <title>RöstiBridge settings</title>
   <style>
-    body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 16px; min-width: 320px; max-width: 560px; color: #1b1b1b; }
-    h1 { font-size: 18px; margin: 0 0 4px; color: #d52b1e; }
-    p.sub { margin: 0 0 14px; color: #555; }
-    label { display: block; margin: 10px 0 2px; font-weight: 600; }
-    input, select { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid #bbb; border-radius: 4px; }
-    .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
-    .row input { width: auto; }
-    button { margin-top: 14px; padding: 6px 16px; background: #d52b1e; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
-    #msg { margin-left: 8px; color: #2a7a2a; }
-    small { color: #666; }
+    /* Same page serves the toolbar popup and the add-on options tab: a fixed, compact card,
+       centred when it gets a whole tab. */
+    html { background: #f4f4f4; }
+    body { font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1b1b1b; box-sizing: border-box;
+      width: 320px; margin: 0 auto; padding: 12px 14px; background: #fff; }
+    @media (min-width: 480px) { body { margin: 32px auto; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,.08); } }
+    header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    header img { width: 32px; height: 32px; }
+    h1 { font-size: 16px; margin: 0; color: #d52b1e; }
+    p.sub { margin: 0; color: #666; font-size: 12px; }
+    label { display: block; margin: 8px 0 2px; font-weight: 600; font-size: 12px; }
+    input, select { width: 100%; box-sizing: border-box; padding: 4px 6px; font: inherit; border: 1px solid #bbb; border-radius: 4px; }
+    .row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+    .row input { width: auto; margin: 0; }
+    .actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+    button { padding: 5px 14px; font: inherit; background: #d52b1e; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    #msg { color: #2a7a2a; font-size: 12px; }
+    small { display: block; color: #777; font-size: 11px; margin-top: 2px; }
   </style>
 </head>
 <body>
-  <h1>RöstiBridge</h1>
-  <p class="sub">Flags meaning differences between language versions of Swiss official pages, using Apertus.</p>
+  <header>
+    <img src="../icons/icon-48.png" alt="">
+    <div><h1>RöstiBridge</h1><p class="sub">Meaning differences between language versions, via Apertus.</p></div>
+  </header>
   <label class="row"><input id="enabled" type="checkbox"> Enabled</label>
   <label for="apiKey">Apertus API key</label>
   <input id="apiKey" type="password" autocomplete="off" placeholder="stored only in this browser">
@@ -38,7 +48,7 @@
   <select id="minSeverity">
     <option value="1">1 – everything</option><option value="2">2 – subtle and up</option><option value="3">3 – partial meaning change and up</option><option value="4">4 – clear factual differences only</option>
   </select>
-  <button id="save">Save</button><span id="msg"></span>
+  <div class="actions"><button id="save">Save</button><span id="msg"></span></div>
   <script src="options.js"></script>
 </body>
 </html>

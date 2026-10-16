@@ -9,6 +9,17 @@ browser.storage.local.get(ids).then((s) => {
   }
 });
 
+// display choices apply as soon as they change; the key/endpoint still go through Save + key test
+for (const k of ["enabled", "explainLang", "minSeverity"]) {
+  document.getElementById(k).addEventListener("change", async (e) => {
+    const el = e.target;
+    await browser.storage.local.set({ [k]: el.type === "checkbox" ? el.checked : k === "minSeverity" ? Number(el.value) : el.value });
+    const msg = document.getElementById("msg");
+    msg.style.color = "#2a7a2a";
+    msg.textContent = "Saved. Reload the page to apply.";
+  });
+}
+
 document.getElementById("save").addEventListener("click", async () => {
   const out = {};
   for (const k of ids) {
