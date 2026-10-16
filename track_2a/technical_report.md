@@ -2,7 +2,7 @@
 
 - **Track:** Track 2A, UZH: Detecting Cross-Lingual Semantic Differences in Swiss Government Websites
 - **Event:** Online
-- **Team:** ⟨team name⟩: ⟨members⟩
+- **Team:** RedPandas: Christopher Yazigi, Giovanni Yazbeck, Alfredo Pio Yazbeck
 - **Demo:** Firefox extension in `src/extension` (`dist/roestibridge-0.1.0.xpi`); screenshots in `docs/`
 
 ## 1. Summary
